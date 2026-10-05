@@ -1,0 +1,38 @@
+name: Enable GitHub Pages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/enable-github-pages.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  administration: write
+
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure legacy GitHub Pages source (gh-pages /)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const source = { branch: 'gh-pages', path: '/' };
+            try {
+              const res = await github.rest.repos.createPagesSite({ owner, repo, source });
+              core.info(`Created Pages site: ${res.data.html_url}`);
+            } catch (error) {
+              if (error.status === 409) {
+                const res = await github.rest.repos.updateInformationAboutPagesSite({ owner, repo, source });
+                core.info(`Updated Pages site: ${res.data.html_url}`);
+              } else {
+                core.setFailed(error.message);
+                throw error;
+              }
+            }
