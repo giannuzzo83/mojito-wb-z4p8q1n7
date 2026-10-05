@@ -7,28 +7,42 @@ on:
     paths:
       - '.github/workflows/enable-github-pages.yml'
 
-permissions: write-all
+permissions:
+  contents: read
 
 jobs:
   enable:
     runs-on: ubuntu-latest
     steps:
       - name: Configure legacy GitHub Pages source (gh-pages /)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const source = { branch: 'gh-pages', path: '/' };
-            try {
-              const res = await github.rest.repos.createPagesSite({ owner, repo, source });
-              core.info(`Created Pages site: ${res.data.html_url}`);
-            } catch (error) {
-              if (error.status === 409) {
-                const res = await github.rest.repos.updateInformationAboutPagesSite({ owner, repo, source });
-                core.info(`Updated Pages site: ${res.data.html_url}`);
-              } else {
-                core.setFailed(`${error.status}: ${JSON.stringify(error.response?.data || error.message)}`);
-                throw error;
-              }
-            }
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          TOKEN="${GH_PAT}"
+          if [ -z "${TOKEN}" ]; then
+            echo "::error::Missing repository secret GH_PAT (PAT with repo admin / Pages settings permission). GITHUB_TOKEN cannot create a Pages site."
+            exit 1
+          fi
+          API="https://api.github.com/repos/${{ github.repository }}/pages"
+          BODY='{"source":{"branch":"gh-pages","path":"/"}}'
+          code=$(curl -sS -o /tmp/pages_resp.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${API}" \
+            -d "${BODY}")
+          if [ "${code}" = "409" ]; then
+            code=$(curl -sS -o /tmp/pages_resp.json -w "%{http_code}" -X PUT \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "${API}" \
+              -d "${BODY}")
+          fi
+          cat /tmp/pages_resp.json
+          if [ "${code}" -lt 200 ] || [ "${code}" -ge 300 ]; then
+            echo "::error::Pages API returned HTTP ${code}"
+            exit 1
+          fi
+          echo "html_url=$(jq -r .html_url /tmp/pages_resp.json)"
