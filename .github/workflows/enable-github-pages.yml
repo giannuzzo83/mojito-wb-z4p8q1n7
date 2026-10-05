@@ -7,10 +7,7 @@ on:
     paths:
       - '.github/workflows/enable-github-pages.yml'
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: write-all
 
 jobs:
   enable:
@@ -31,7 +28,7 @@ jobs:
                 const res = await github.rest.repos.updateInformationAboutPagesSite({ owner, repo, source });
                 core.info(`Updated Pages site: ${res.data.html_url}`);
               } else {
-                core.setFailed(`${error.status}: ${error.message}`);
+                core.setFailed(`${error.status}: ${JSON.stringify(error.response?.data || error.message)}`);
                 throw error;
               }
             }
