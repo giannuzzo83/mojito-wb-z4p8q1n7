@@ -11,7 +11,6 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  administration: write
 
 jobs:
   enable:
@@ -32,7 +31,7 @@ jobs:
                 const res = await github.rest.repos.updateInformationAboutPagesSite({ owner, repo, source });
                 core.info(`Updated Pages site: ${res.data.html_url}`);
               } else {
-                core.setFailed(error.message);
+                core.setFailed(`${error.status}: ${error.message}`);
                 throw error;
               }
             }
